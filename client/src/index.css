@@ -1,0 +1,205 @@
+@import "../styles/globals.css";
+
+@layer base {
+  :root {
+    @apply font-sans;
+  }
+
+  body {
+    @apply grid place-items-center min-w-[320px] min-h-screen relative m-0;
+    background: #1a1a1a;
+    color: #ccc;
+  }
+}
+
+/* ── Control Panel ── */
+
+.cp-page {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  box-sizing: border-box;
+  background: #1a1a1a;
+}
+
+.cp-panel {
+  width: 100%;
+  max-width: 680px;
+  background: linear-gradient(180deg, #2e2e2e 0%, #252525 100%);
+  border-radius: 12px;
+  border: 1px solid #3a3a3a;
+  box-shadow:
+    0 2px 0 #111 inset,
+    0 -1px 0 #444 inset,
+    0 20px 60px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+}
+
+/* Header strip */
+.cp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: linear-gradient(180deg, #333 0%, #2a2a2a 100%);
+  border-bottom: 1px solid #111;
+  box-shadow: 0 1px 0 #3d3d3d;
+}
+
+.cp-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+/* Master power indicator */
+.cp-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #333;
+  box-shadow: 0 0 0 2px #222;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.cp-status-dot.active {
+  background: #4ade80;
+  box-shadow: 0 0 6px #4ade80, 0 0 0 2px #222;
+}
+
+/* Zones grid */
+.cp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1px;
+  background: #111;
+  border-bottom: 1px solid #111;
+}
+
+/* Each light zone */
+.cp-zone {
+  background: #252525;
+  padding: 24px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+  position: relative;
+}
+.cp-zone:hover {
+  background: #2c2c2c;
+}
+.cp-zone:active {
+  background: #222;
+}
+
+/* Light icon circle */
+.cp-bulb {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: #1e1e1e;
+  border: 2px solid #333;
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+.cp-zone.on .cp-bulb {
+  background: #2a1f00;
+  border-color: #f59e0b;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.5), 0 0 40px rgba(245, 158, 11, 0.2);
+}
+
+/* Zone label */
+.cp-zone-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #555;
+  transition: color 0.3s;
+}
+.cp-zone.on .cp-zone-name {
+  color: #f59e0b;
+}
+
+/* Toggle pill */
+.cp-toggle {
+  width: 36px;
+  height: 18px;
+  border-radius: 9px;
+  background: #333;
+  border: 1px solid #444;
+  position: relative;
+  transition: background 0.3s, border-color 0.3s;
+  flex-shrink: 0;
+}
+.cp-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #555;
+  transition: transform 0.25s, background 0.3s;
+}
+.cp-zone.on .cp-toggle {
+  background: #92400e;
+  border-color: #f59e0b;
+}
+.cp-zone.on .cp-toggle::after {
+  transform: translateX(18px);
+  background: #fbbf24;
+}
+
+/* Footer — master controls */
+.cp-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: #222;
+}
+
+.cp-master-btn {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  border-radius: 5px;
+  border: 1px solid #444;
+  background: #2e2e2e;
+  color: #888;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.cp-master-btn:hover {
+  background: #383838;
+  color: #aaa;
+  border-color: #555;
+}
+.cp-master-btn:active {
+  background: #222;
+}
+
+.cp-count {
+  font-size: 0.65rem;
+  color: #444;
+  letter-spacing: 0.05em;
+}
+.cp-count span {
+  color: #f59e0b;
+  font-weight: 700;
+}
