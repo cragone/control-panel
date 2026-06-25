@@ -109,7 +109,7 @@ func main() {
 		WriteJSONResponse(w, http.StatusNotFound, JSONMap{"message": "hello"})
 	})
 
-	log.Fatal(http.ListenAndServe(":80", mux))
+	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 
 type JSONMap map[string]any

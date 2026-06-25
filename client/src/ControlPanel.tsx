@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Protocol zone names — must match exactly in the Go server and ESP32 firmware.
 // Supported zones: "desktop"
@@ -8,23 +8,42 @@ const LIGHTS = [
 
 type LightId = (typeof LIGHTS)[number]["id"];
 
+const WS_URL = "ws://localhost:8080/ws";
+
 export function ControlPanel() {
   const [on, setOn] = useState<Set<LightId>>(new Set());
+  const ws = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const socket = new WebSocket(WS_URL);
+    ws.current = socket;
+    return () => socket.close();
+  }, []);
+
+  function send(id: LightId, state: boolean) {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ zone: id, state }));
+    }
+  }
 
   function toggle(id: LightId) {
     setOn((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      const nowOn = !next.has(id);
+      nowOn ? next.add(id) : next.delete(id);
+      send(id, nowOn);
       return next;
     });
   }
 
   function allOn() {
     setOn(new Set(LIGHTS.map((l) => l.id)));
+    LIGHTS.forEach((l) => send(l.id, true));
   }
 
   function allOff() {
     setOn(new Set());
+    LIGHTS.forEach((l) => send(l.id, false));
   }
 
   const activeCount = on.size;
