@@ -95,11 +95,11 @@
   box-shadow: 0 0 8px #4ade80, 0 0 16px rgba(74, 222, 128, 0.3), 0 0 0 1px #0a0a0a;
 }
 
-/* Zones grid — 4 cols × 2 rows, fills all remaining height */
+/* Zones grid — single column, fills all remaining height */
 .cp-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
   gap: 1px;
   background: #0a0a0a;
   flex: 1;

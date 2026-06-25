@@ -36,16 +36,6 @@ export function ControlPanel() {
     });
   }
 
-  function allOn() {
-    setOn(new Set(LIGHTS.map((l) => l.id)));
-    LIGHTS.forEach((l) => send(l.id, true));
-  }
-
-  function allOff() {
-    setOn(new Set());
-    LIGHTS.forEach((l) => send(l.id, false));
-  }
-
   const activeCount = on.size;
 
   return (
@@ -82,14 +72,6 @@ export function ControlPanel() {
         </div>
 
         <footer className="cp-footer">
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="cp-master-btn" onClick={allOn}>
-              All On
-            </button>
-            <button className="cp-master-btn" onClick={allOff}>
-              All Off
-            </button>
-          </div>
           <span className="cp-count">
             <span>{activeCount}</span> / {LIGHTS.length} on
           </span>
