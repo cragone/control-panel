@@ -93,8 +93,19 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			log.Printf("browser disconnected: %v", err)
 			break
 		}
+
+		// Validate the message is a JSON object before forwarding.
+		var payload map[string]any
+		if err := json.Unmarshal(message, &payload); err != nil {
+			log.Printf("invalid JSON from browser: %v", err)
+			_ = conn.WriteJSON(JSONMap{"ok": false, "error": "invalid JSON"})
+			continue
+		}
+
 		log.Printf("browser -> ESP32: %s", message)
 		sendToESP32(message)
+
+		_ = conn.WriteJSON(JSONMap{"ok": true})
 	}
 }
 
