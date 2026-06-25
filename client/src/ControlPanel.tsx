@@ -38,8 +38,13 @@ export function ControlPanel() {
     <div className="cp-page">
       <div className="cp-panel">
         <header className="cp-header">
-          <span className="cp-title">Light Control</span>
-          <div className={`cp-status-dot ${activeCount > 0 ? "active" : ""}`} />
+          <div className="cp-header-left">
+            <span className="cp-title">Light Control</span>
+            <span className="cp-subtitle">Model CP-01 · Zone Controller</span>
+          </div>
+          <div className="cp-header-right">
+            <div className={`cp-status-dot ${activeCount > 0 ? "active" : ""}`} />
+          </div>
         </header>
 
         <div className="cp-grid">
