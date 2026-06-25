@@ -1,14 +1,9 @@
 import { useState } from "react";
 
+// Protocol zone names — must match exactly in the Go server and ESP32 firmware.
+// Supported zones: "desktop"
 const LIGHTS = [
-  { id: "living-room", name: "Living Room", icon: "💡" },
-  { id: "bedroom", name: "Bedroom", icon: "🛏️" },
-  { id: "kitchen", name: "Kitchen", icon: "🍳" },
-  { id: "bathroom", name: "Bathroom", icon: "🚿" },
-  { id: "office", name: "Office", icon: "🖥️" },
-  { id: "garage", name: "Garage", icon: "🚗" },
-  { id: "outdoor", name: "Outdoor", icon: "🌿" },
-  { id: "hallway", name: "Hallway", icon: "🚪" },
+  { id: "desktop", name: "Desktop", icon: "🖥️" },
 ] as const;
 
 type LightId = (typeof LIGHTS)[number]["id"];
