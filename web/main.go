@@ -5,13 +5,16 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
-	"time"
+	"strings"
 
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gorilla/websocket"
 )
 
-const defaultESP32Addr = "192.168.1.250:81"
+const (
+	defaultBroker = "tcp://localhost:1883"
+	topicPrefix   = "lights/"
+)
 
 var (
 	upgrader = websocket.Upgrader{
@@ -20,61 +23,61 @@ var (
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
 
-	esp32Mu   sync.Mutex
-	esp32Conn *websocket.Conn
+	mqttClient mqtt.Client
 )
 
-func esp32URL() string {
-	addr := os.Getenv("ESP32_ADDR")
-	if addr == "" {
-		addr = defaultESP32Addr
-	}
-	return "ws://" + addr + "/"
+type LightMsg struct {
+	Zone  string `json:"zone"`
+	State bool   `json:"state"`
 }
 
-// connectESP32 runs forever in a goroutine, maintaining the outbound
-// connection to the ESP32 and reconnecting on drop.
-func connectESP32() {
-	url := esp32URL()
-	for {
-		log.Printf("dialing ESP32 at %s", url)
-		c, _, err := websocket.DefaultDialer.Dial(url, nil)
-		if err != nil {
-			log.Printf("ESP32 dial failed: %v — retrying in 5s", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		log.Println("connected to ESP32")
-
-		esp32Mu.Lock()
-		esp32Conn = c
-		esp32Mu.Unlock()
-
-		// Drain any incoming frames to keep the connection alive.
-		for {
-			if _, _, err := c.ReadMessage(); err != nil {
-				log.Printf("ESP32 connection lost: %v — reconnecting", err)
-				break
-			}
-		}
-
-		esp32Mu.Lock()
-		esp32Conn = nil
-		esp32Mu.Unlock()
-		c.Close()
-		time.Sleep(5 * time.Second)
+func brokerURL() string {
+	b := os.Getenv("MQTT_BROKER")
+	if b == "" {
+		return defaultBroker
 	}
+	if !strings.Contains(b, "://") {
+		return "tcp://" + b + ":1883"
+	}
+	return b
 }
 
-func sendToESP32(msg []byte) {
-	esp32Mu.Lock()
-	defer esp32Mu.Unlock()
-	if esp32Conn == nil {
-		log.Println("ESP32 not connected — message dropped")
+func connectMQTT() mqtt.Client {
+	opts := mqtt.NewClientOptions().
+		AddBroker(brokerURL()).
+		SetClientID("control-panel").
+		SetAutoReconnect(true).
+		SetOnConnectHandler(func(_ mqtt.Client) {
+			log.Println("MQTT connected")
+		}).
+		SetConnectionLostHandler(func(_ mqtt.Client, err error) {
+			log.Printf("MQTT connection lost: %v", err)
+		})
+
+	c := mqtt.NewClient(opts)
+	if tok := c.Connect(); tok.Wait() && tok.Error() != nil {
+		log.Fatalf("MQTT connect: %v", tok.Error())
+	}
+	return c
+}
+
+func publishToMQTT(msg []byte) {
+	var payload LightMsg
+	if err := json.Unmarshal(msg, &payload); err != nil || payload.Zone == "" {
+		log.Printf("invalid message, skipping: %v", err)
 		return
 	}
-	if err := esp32Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-		log.Printf("ESP32 write error: %v", err)
+
+	topic := topicPrefix + payload.Zone
+	state := "0"
+	if payload.State {
+		state = "1"
+	}
+
+	tok := mqttClient.Publish(topic, 1, false, state)
+	tok.Wait()
+	if err := tok.Error(); err != nil {
+		log.Printf("MQTT publish error: %v", err)
 	}
 }
 
@@ -94,7 +97,6 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Validate the message is a JSON object before forwarding.
 		var payload map[string]any
 		if err := json.Unmarshal(message, &payload); err != nil {
 			log.Printf("invalid JSON from browser: %v", err)
@@ -102,8 +104,8 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		log.Printf("browser -> ESP32: %s", message)
-		sendToESP32(message)
+		log.Printf("browser -> MQTT: %s", message)
+		publishToMQTT(message)
 
 		_ = conn.WriteJSON(JSONMap{"ok": true})
 	}
@@ -112,7 +114,7 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 func main() {
 	log.Println("booting application")
 
-	go connectESP32()
+	mqttClient = connectMQTT()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", HandleConnections)
