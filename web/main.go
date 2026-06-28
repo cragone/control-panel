@@ -82,9 +82,18 @@ func publishToMQTT(msg []byte) {
 	}
 }
 
+// discardWriter absorbs the upgrader's own error response so we can write our own.
+type discardWriter struct {
+	http.ResponseWriter
+}
+
+func (dw *discardWriter) WriteHeader(int) {}
+func (dw *discardWriter) Write(b []byte) (int, error) { return len(b), nil }
+
 func HandleConnections(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(&discardWriter{w}, r, nil)
 	if err != nil {
+		log.Printf("WebSocket upgrade failed: %v", err)
 		WriteJSONResponse(w, http.StatusBadRequest, JSONMap{"error": err.Error()})
 		return
 	}
