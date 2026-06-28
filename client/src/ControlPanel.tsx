@@ -6,7 +6,7 @@ const LIGHTS = [{ id: "desktop", name: "Desktop", icon: "🖥️" }] as const;
 
 type LightId = (typeof LIGHTS)[number]["id"];
 
-const WS_URL = `ws://192.168.111.1:8080/ws`;
+const WS_URL = `ws://192.168.1.111:8080/ws`;
 
 export function ControlPanel() {
   const [on, setOn] = useState<Set<LightId>>(new Set());
