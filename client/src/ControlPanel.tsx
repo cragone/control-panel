@@ -8,7 +8,7 @@ const LIGHTS = [
 
 type LightId = (typeof LIGHTS)[number]["id"];
 
-const WS_URL = "ws://localhost:8080/ws";
+const WS_URL = `ws://${window.location.hostname}:8080/ws`;
 
 export function ControlPanel() {
   const [on, setOn] = useState<Set<LightId>>(new Set());
