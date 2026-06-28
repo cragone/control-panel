@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -89,6 +92,13 @@ type discardWriter struct {
 
 func (dw *discardWriter) WriteHeader(int) {}
 func (dw *discardWriter) Write(b []byte) (int, error) { return len(b), nil }
+func (dw *discardWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := dw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("underlying ResponseWriter does not implement http.Hijacker")
+	}
+	return hj.Hijack()
+}
 
 func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(&discardWriter{w}, r, nil)
@@ -141,6 +151,14 @@ type statusWriter struct {
 func (sw *statusWriter) WriteHeader(code int) {
 	sw.code = code
 	sw.ResponseWriter.WriteHeader(code)
+}
+
+func (sw *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := sw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("underlying ResponseWriter does not implement http.Hijacker")
+	}
+	return hj.Hijack()
 }
 
 func logRequests(next http.Handler) http.Handler {
