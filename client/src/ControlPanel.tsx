@@ -2,13 +2,11 @@ import { useEffect, useRef, useState } from "react";
 
 // Protocol zone names — must match exactly in the Go server and ESP32 firmware.
 // Supported zones: "desktop"
-const LIGHTS = [
-  { id: "desktop", name: "Desktop", icon: "🖥️" },
-] as const;
+const LIGHTS = [{ id: "desktop", name: "Desktop", icon: "🖥️" }] as const;
 
 type LightId = (typeof LIGHTS)[number]["id"];
 
-const WS_URL = `ws://${window.location.hostname}:8080/ws`;
+const WS_URL = `ws://192.168.111.1:8080/ws`;
 
 export function ControlPanel() {
   const [on, setOn] = useState<Set<LightId>>(new Set());
@@ -47,7 +45,9 @@ export function ControlPanel() {
             <span className="cp-subtitle">Model CP-01 · Zone Controller</span>
           </div>
           <div className="cp-header-right">
-            <div className={`cp-status-dot ${activeCount > 0 ? "active" : ""}`} />
+            <div
+              className={`cp-status-dot ${activeCount > 0 ? "active" : ""}`}
+            />
           </div>
         </header>
 
