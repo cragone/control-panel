@@ -12,6 +12,7 @@ WiFiClient   wifiClient;
 PubSubClient mqtt(wifiClient);
 
 void onMessage(char* topic, byte* payload, unsigned int length) {
+  Serial.printf("[%lu ms] MQTT <- topic=%s payload=%.*s\n", millis(), topic, (int)length, (char*)payload);
   bool state = (length > 0 && payload[0] == '1');
   if (strcmp(topic, TOPIC_DESKTOP) == 0) {
     digitalWrite(LIGHT_PIN, state ? HIGH : LOW);
