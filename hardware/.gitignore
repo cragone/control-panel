@@ -1,3 +1,6 @@
+# PlatformIO build artifacts
+.pio
+
 # dependencies (bun install)
 node_modules
 
