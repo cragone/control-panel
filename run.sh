@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "pulling latest"
+git pull origin main
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "==> Building frontend..."
