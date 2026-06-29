@@ -24,7 +24,7 @@ var (
 	upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin: func(r *http.Request) bool { return true },
+		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 
 	mqttClient mqtt.Client
@@ -90,7 +90,7 @@ type discardWriter struct {
 	http.ResponseWriter
 }
 
-func (dw *discardWriter) WriteHeader(int) {}
+func (dw *discardWriter) WriteHeader(int)             {}
 func (dw *discardWriter) Write(b []byte) (int, error) { return len(b), nil }
 func (dw *discardWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hj, ok := dw.ResponseWriter.(http.Hijacker)
@@ -138,9 +138,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", HandleConnections)
-	mux.Handle("/", http.FileServer(http.Dir("../client/dist")))
+	mux.Handle("/", http.FileServer(http.Dir("dist")))
 
-	log.Fatal(http.ListenAndServe(":8080", logRequests(mux)))
+	log.Fatal(http.ListenAndServe(":80", logRequests(mux)))
 }
 
 type statusWriter struct {

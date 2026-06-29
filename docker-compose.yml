@@ -1,0 +1,18 @@
+services:
+  broker:
+    image: eclipse-mosquitto
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./broker/mosquitto/data:/mosquitto/data
+
+  web:
+    build: ./web
+    ports:
+      - "80:80"
+    environment:
+      - MQTT_BROKER=broker
+    depends_on:
+      - broker

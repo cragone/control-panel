@@ -14,6 +14,11 @@ echo "==> Replacing dist..."
 rm -rf "$SCRIPT_DIR/web/dist"
 mv "$SCRIPT_DIR/client/dist" "$SCRIPT_DIR/web/dist"
 
+
+echo "==> Starting Broker"
+cd "$SCRIPT_DIR/broker"
+docker compose up
+
 echo "==> Starting server..."
 cd "$SCRIPT_DIR/web"
 exec go run .
