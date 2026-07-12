@@ -6,7 +6,7 @@ const LIGHTS = [{ id: "desktop", name: "Desktop", icon: "🖥️" }] as const;
 
 type LightId = (typeof LIGHTS)[number]["id"];
 
-const WS_URL = `ws://192.168.1.111:8080/ws`;
+const WS_URL = `ws://192.168.1.111/ws`;
 
 export function ControlPanel() {
   const [on, setOn] = useState<Set<LightId>>(new Set());
@@ -15,6 +15,19 @@ export function ControlPanel() {
   useEffect(() => {
     const socket = new WebSocket(WS_URL);
     ws.current = socket;
+
+    socket.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+      if (typeof payload.zone !== "string" || typeof payload.state !== "boolean") {
+        return;
+      }
+      setOn((prev) => {
+        const next = new Set(prev);
+        payload.state ? next.add(payload.zone) : next.delete(payload.zone);
+        return next;
+      });
+    };
+
     return () => socket.close();
   }, []);
 

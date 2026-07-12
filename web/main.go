@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -28,7 +29,48 @@ var (
 	}
 
 	mqttClient mqtt.Client
+
+	clientsMu sync.Mutex
+	clients   = map[*websocket.Conn]bool{}
+
+	stateMu sync.Mutex
+	state   = map[string]bool{}
 )
+
+func registerClient(conn *websocket.Conn) {
+	clientsMu.Lock()
+	clients[conn] = true
+	clientsMu.Unlock()
+}
+
+func unregisterClient(conn *websocket.Conn) {
+	clientsMu.Lock()
+	delete(clients, conn)
+	clientsMu.Unlock()
+}
+
+func sendSnapshot(conn *websocket.Conn) {
+	stateMu.Lock()
+	snapshot := make(map[string]bool, len(state))
+	for zone, on := range state {
+		snapshot[zone] = on
+	}
+	stateMu.Unlock()
+
+	for zone, on := range snapshot {
+		_ = conn.WriteJSON(LightMsg{Zone: zone, State: on})
+	}
+}
+
+func broadcast(msg LightMsg) {
+	clientsMu.Lock()
+	defer clientsMu.Unlock()
+	for conn := range clients {
+		if err := conn.WriteJSON(msg); err != nil {
+			log.Printf("broadcast write error: %v", err)
+		}
+	}
+}
 
 type LightMsg struct {
 	Zone  string `json:"zone"`
@@ -65,24 +107,31 @@ func connectMQTT() mqtt.Client {
 	return c
 }
 
-func publishToMQTT(msg []byte) {
+func publishToMQTT(msg []byte) (LightMsg, error) {
 	var payload LightMsg
 	if err := json.Unmarshal(msg, &payload); err != nil || payload.Zone == "" {
 		log.Printf("invalid message, skipping: %v", err)
-		return
+		return payload, fmt.Errorf("invalid message: %w", err)
 	}
 
 	topic := topicPrefix + payload.Zone
-	state := "0"
+	statePayload := "0"
 	if payload.State {
-		state = "1"
+		statePayload = "1"
 	}
 
-	tok := mqttClient.Publish(topic, 1, false, state)
+	tok := mqttClient.Publish(topic, 1, true, statePayload)
 	tok.Wait()
 	if err := tok.Error(); err != nil {
 		log.Printf("MQTT publish error: %v", err)
+		return payload, err
 	}
+
+	stateMu.Lock()
+	state[payload.Zone] = payload.State
+	stateMu.Unlock()
+
+	return payload, nil
 }
 
 // discardWriter absorbs the upgrader's own error response so we can write our own.
@@ -110,6 +159,10 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 	log.Println("browser connected")
 
+	registerClient(conn)
+	defer unregisterClient(conn)
+	sendSnapshot(conn)
+
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
@@ -125,9 +178,13 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 
 		log.Printf("browser -> MQTT: %s", message)
-		publishToMQTT(message)
+		lightMsg, err := publishToMQTT(message)
+		if err != nil {
+			_ = conn.WriteJSON(JSONMap{"ok": false, "error": err.Error()})
+			continue
+		}
 
-		_ = conn.WriteJSON(JSONMap{"ok": true})
+		broadcast(lightMsg)
 	}
 }
 
