@@ -19,6 +19,7 @@ Companion docs to `../src/main.cpp`. Two diagrams:
 | GPIO5     | HC-SR04 TRIG                           | |
 | GPIO18    | HC-SR04 ECHO                           | |
 | GPIO34    | E-STOP sense (NO contact + pull-up)    | input-only pin, no internal pull resistor — needs external 10k pull-up to 3.3V |
+| GPIO35    | Battery voltage sense (via divider)    | input-only, ADC1_CH7 — 100k/27k divider from battery+ to GND, tap at the midpoint |
 
 ## Power chain
 
@@ -32,6 +33,8 @@ Battery(12V) → Main Switch → Fuse (20A) → E-STOP (NC contact) → +12V bus
 **Why the e-stop is wired on the NC contact, not just read as a GPIO:** a software-only e-stop dies with the ESP32 — if it crashes or hangs, the motors keep running. Wiring the mushroom switch's NC contact in series with the +12V bus means pressing it physically breaks motor and blade power regardless of firmware state. The switch's NO contact is wired separately to GPIO34 (through a pull-up) purely so the firmware can log the event and refuse to resume — see `onEstop()` / `estopLatched` in `main.cpp`.
 
 All module grounds return to one common ground bus tied to battery negative. Don't let the blade motor's ground share a return path with the ESP32's logic ground right at the connector — tie them at the battery terminal instead, to keep blade motor noise off the signal lines.
+
+**Battery voltage sense:** a 100k/27k divider taps off the +12V bus (before the switch, so it reads true battery voltage) down to GPIO35. Firmware samples it every 2s and latches motors/blade off below 11V — see `readBatteryVoltage()` / `BATTERY_LOW` in `main.cpp`. Like the e-stop, this is a soft cutoff only (software-latched, not a hardware disconnect) — good enough to protect the battery from deep-discharge, but not a substitute for the e-stop's hardware path.
 
 ## Mechanical layout
 

@@ -21,16 +21,28 @@
 // pin LOW when pressed.
 #define ESTOP_PIN 34
 
+// Battery voltage sense. GPIO35 is input-only (ADC1_CH7) — pairs naturally
+// with GPIO34 for two no-cost sense lines. Battery+ feeds a divider (100k
+// top / 27k bottom) down to this pin so a 15V worst-case charge voltage
+// lands at ~3.2V, safely under the ESP32's 3.3V ADC limit.
+#define BATTERY_ADC_PIN 35
+#define BATTERY_DIVIDER_RATIO (27.0f / (100.0f + 27.0f))
+#define ADC_REF_VOLTAGE 3.3f
+#define ADC_MAX_COUNT   4095.0f
+
 // ---- Tuning ---------------------------------------------------------------
 #define DRIVE_SPEED       180   // 0-255
 #define TURN_SPEED        160
 #define OBSTACLE_CM       35    // stop/avoid distance
 #define BACKUP_MS         600
 #define TURN_MS           500
+#define BATTERY_CHECK_MS      2000  // how often to sample battery voltage
+#define LOW_BATTERY_VOLTAGE   11.0f // stop and latch below this (12V SLA — don't deep-discharge)
 
-enum State { MOWING, BACKING_UP, TURNING, ESTOPPED };
+enum State { MOWING, BACKING_UP, TURNING, ESTOPPED, BATTERY_LOW };
 static State state = MOWING;
 static unsigned long stateStartedAt = 0;
+static unsigned long lastBatteryCheckAt = 0;
 
 // Latches true on the first e-stop press and stays true until reboot —
 // an e-stop that could clear itself isn't a safety feature.
@@ -87,6 +99,18 @@ void enterState(State next) {
   stateStartedAt = millis();
 }
 
+// Averages a few samples to smooth out ADC noise on the divider.
+float readBatteryVoltage() {
+  const int samples = 8;
+  uint32_t total = 0;
+  for (int i = 0; i < samples; i++) {
+    total += analogRead(BATTERY_ADC_PIN);
+    delayMicroseconds(200);
+  }
+  float adcVoltage = (total / (float)samples) * (ADC_REF_VOLTAGE / ADC_MAX_COUNT);
+  return adcVoltage / BATTERY_DIVIDER_RATIO;
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -100,6 +124,7 @@ void setup() {
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
   pinMode(ESTOP_PIN, INPUT);
+  analogReadResolution(12);
 
   // Safe defaults before anything else can run.
   stopMotors();
@@ -119,9 +144,25 @@ void loop() {
     Serial.println("E-STOP triggered. Motors and blade off. Reset board to clear.");
   }
 
+  if (state != ESTOPPED && state != BATTERY_LOW && millis() - lastBatteryCheckAt >= BATTERY_CHECK_MS) {
+    lastBatteryCheckAt = millis();
+    float voltage = readBatteryVoltage();
+    if (voltage < LOW_BATTERY_VOLTAGE) {
+      stopMotors();
+      bladeOff();
+      enterState(BATTERY_LOW);
+      Serial.printf("Battery low: %.2fV. Motors and blade off. Recharge and reset board to clear.\n", voltage);
+    }
+  }
+
   switch (state) {
     case ESTOPPED:
       // Do nothing, forever, until physically reset.
+      return;
+
+    case BATTERY_LOW:
+      // Same as ESTOPPED: latched off until the board is reset. Resuming
+      // autonomously on a sagging battery risks a brownout mid-mow.
       return;
 
     case MOWING: {
