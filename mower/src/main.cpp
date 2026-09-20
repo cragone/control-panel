@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>
 
 // ---- Pins ---------------------------------------------------------------
 // Drive motors via a dual H-bridge (e.g. L298N). ENA/ENB are PWM speed pins.
@@ -43,6 +44,113 @@ enum State { MOWING, BACKING_UP, TURNING, ESTOPPED, BATTERY_LOW };
 static State state = MOWING;
 static unsigned long stateStartedAt = 0;
 static unsigned long lastBatteryCheckAt = 0;
+
+// ---- Localization (WiFi RSSI trilateration) -------------------------------
+// Fixed ESP32 boards (see ../beacon) each broadcast an AP named
+// MOWER-BEACON-<n>. This board estimates its own (x, y) position in meters
+// by trilaterating against 3+ of them at known, surveyed spots. Good to a
+// couple meters outdoors — fine for a small fenced yard, not for anything
+// needing tight precision. See ../docs/localization.md for setup/calibration.
+
+struct Beacon { const char* ssid; float x, y; };
+
+// Measure each beacon's position with a tape measure from one fixed corner
+// of the yard (the origin, 0,0) and fill these in before relying on it.
+static const Beacon BEACONS[] = {
+  { "MOWER-BEACON-1", 0.0f,  0.0f  },
+  { "MOWER-BEACON-2", 10.0f, 0.0f  },
+  { "MOWER-BEACON-3", 0.0f,  10.0f },
+};
+#define BEACON_COUNT (sizeof(BEACONS) / sizeof(BEACONS[0]))
+
+// Path-loss calibration — both drift with environment. Measure
+// TX_POWER_AT_1M by placing the mower exactly 1m from a beacon and reading
+// its logged RSSI. Start PATH_LOSS_EXPONENT at 2.5 for open yard, raise
+// toward 3-4 if fences/obstructions shorten effective range.
+#define TX_POWER_AT_1M      -40.0f
+#define PATH_LOSS_EXPONENT   2.5f
+#define LOCATE_INTERVAL_MS   5000
+
+static bool wifiScanInProgress = false;
+static unsigned long lastScanStartAt = 0;
+static float mowerX = 0, mowerY = 0;
+static bool havePositionFix = false;
+
+float distanceFromRssi(int rssi) {
+  return pow(10.0f, (TX_POWER_AT_1M - rssi) / (10.0f * PATH_LOSS_EXPONENT));
+}
+
+// Solves 2D trilateration from three (x, y, distance) points by linearizing
+// against the first point. Returns false if the beacons are collinear.
+bool trilaterate(float x1, float y1, float d1,
+                  float x2, float y2, float d2,
+                  float x3, float y3, float d3,
+                  float &outX, float &outY) {
+  float A = 2 * (x2 - x1), B = 2 * (y2 - y1);
+  float C = d1 * d1 - d2 * d2 - x1 * x1 + x2 * x2 - y1 * y1 + y2 * y2;
+  float D = 2 * (x3 - x1), E = 2 * (y3 - y1);
+  float F = d1 * d1 - d3 * d3 - x1 * x1 + x3 * x3 - y1 * y1 + y3 * y3;
+
+  float det = A * E - B * D;
+  if (fabs(det) < 1e-6f) return false; // beacons are collinear
+
+  outX = (C * E - B * F) / det;
+  outY = (A * F - C * D) / det;
+  return true;
+}
+
+void startBeaconScan() {
+  WiFi.scanNetworks(true /* async */);
+  wifiScanInProgress = true;
+  lastScanStartAt = millis();
+}
+
+void pollBeaconScan() {
+  int n = WiFi.scanComplete();
+  if (n == WIFI_SCAN_RUNNING || n == WIFI_SCAN_FAILED) return;
+
+  wifiScanInProgress = false;
+
+  float bx[BEACON_COUNT], by[BEACON_COUNT], bd[BEACON_COUNT];
+  bool seen[BEACON_COUNT] = {};
+  int found = 0;
+
+  for (int i = 0; i < n; i++) {
+    String ssid = WiFi.SSID(i);
+    for (size_t b = 0; b < BEACON_COUNT; b++) {
+      if (!seen[b] && ssid == BEACONS[b].ssid) {
+        seen[b] = true;
+        bx[b] = BEACONS[b].x;
+        by[b] = BEACONS[b].y;
+        bd[b] = distanceFromRssi(WiFi.RSSI(i));
+        found++;
+      }
+    }
+  }
+  WiFi.scanDelete();
+
+  if (found >= 3) {
+    int idx[3], k = 0;
+    for (size_t b = 0; b < BEACON_COUNT && k < 3; b++) {
+      if (seen[b]) idx[k++] = b;
+    }
+    float x, y;
+    if (trilaterate(bx[idx[0]], by[idx[0]], bd[idx[0]],
+                     bx[idx[1]], by[idx[1]], bd[idx[1]],
+                     bx[idx[2]], by[idx[2]], bd[idx[2]], x, y)) {
+      mowerX = x;
+      mowerY = y;
+      havePositionFix = true;
+      Serial.printf("Position: (%.2f, %.2f) m [%d beacons]\n", x, y, found);
+    } else {
+      havePositionFix = false;
+      Serial.println("Position: beacons collinear, no fix.");
+    }
+  } else {
+    havePositionFix = false;
+    Serial.printf("Position: no fix (%d/3 beacons visible)\n", found);
+  }
+}
 
 // Latches true on the first e-stop press and stays true until reboot —
 // an e-stop that could clear itself isn't a safety feature.
@@ -132,6 +240,10 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(ESTOP_PIN), onEstop, FALLING);
 
+  // STA mode with no AP connection — scanning works standalone.
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
   Serial.println("Mower firmware up. MOWING.");
   enterState(MOWING);
 }
@@ -153,6 +265,14 @@ void loop() {
       enterState(BATTERY_LOW);
       Serial.printf("Battery low: %.2fV. Motors and blade off. Recharge and reset board to clear.\n", voltage);
     }
+  }
+
+  // Position telemetry runs regardless of mower state — useful even stopped.
+  if (!wifiScanInProgress && millis() - lastScanStartAt >= LOCATE_INTERVAL_MS) {
+    startBeaconScan();
+  }
+  if (wifiScanInProgress) {
+    pollBeaconScan();
   }
 
   switch (state) {

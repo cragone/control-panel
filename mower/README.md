@@ -7,12 +7,17 @@ Autonomous lawn mower brain. Built with PlatformIO and the Arduino framework.
 Boots up, keeps blade and drive motors off until safety pins are configured,
 then mows forward. On obstacle detection (ultrasonic < 35cm) it backs up,
 turns, and resumes. Pressing the e-stop button latches motors and blade off
-until the board is power-cycled.
+until the board is power-cycled. Battery voltage is sampled every 2s and
+latches everything off below 11V.
 
-Not yet implemented: GPS/perimeter navigation, coverage pattern, WiFi/MQTT
-remote monitoring (see `../hardware` for the MQTT pattern used elsewhere in
-this repo — the plan is to follow it here once the base drive/safety loop is
-solid).
+It also estimates its own position every 5s by trilaterating WiFi signal
+strength against fixed beacon boards (see `docs/localization.md` and
+`../beacon/`) — logged over serial, not yet used for navigation.
+
+Not yet implemented: using the position estimate for coverage (currently
+pure reactive obstacle-avoidance, no memory of where it's been), MQTT
+remote monitoring (see `../hardware` for the pattern used elsewhere in this
+repo — the plan is to follow it here once the base loop is solid).
 
 ## Wiring (defaults, edit pins in `src/main.cpp` to match your build)
 
@@ -28,6 +33,7 @@ solid).
 | GPIO 5    | Ultrasonic TRIG                |
 | GPIO 18   | Ultrasonic ECHO                |
 | GPIO 34   | E-stop button (active LOW, needs external pull-up) |
+| GPIO 35   | Battery voltage divider (100k/27k from battery+) |
 
 Assumes a dual H-bridge driver (L298N or similar) for the two drive motors,
 and a separate relay for the blade motor — never power the blade off the
