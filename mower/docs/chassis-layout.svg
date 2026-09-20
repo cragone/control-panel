@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1000" font-family="Helvetica, Arial, sans-serif">
+  <style>
+    .deck { fill: #eef1f3; stroke: #1f2933; stroke-width: 3; }
+    .part { fill: #ffffff; stroke: #1f2933; stroke-width: 2; }
+    .wheel { fill: #37474f; stroke: #1f2933; stroke-width: 2; }
+    .blade { fill: none; stroke: #c0392b; stroke-width: 2; stroke-dasharray: 6 4; }
+    .label { fill: #1f2933; font-size: 14px; font-weight: 600; }
+    .sub { fill: #52606d; font-size: 11px; }
+  </style>
+
+  <rect x="0" y="0" width="900" height="1000" fill="#fbfbfa"/>
+  <text x="24" y="34" font-size="22" font-weight="700" fill="#1f2933">Mower — Top-Down Chassis Layout</text>
+  <text x="24" y="54" class="sub">Front is up. Deck outline is a suggested footprint, not a cut template.</text>
+
+  <!-- front direction arrow -->
+  <path d="M450,80 L470,120 L455,120 L455,150 L445,150 L445,120 L430,120 Z" fill="#2a6fdb"/>
+  <text x="450" y="170" class="sub" text-anchor="middle">FRONT</text>
+
+  <!-- deck outline -->
+  <rect class="deck" x="150" y="190" width="600" height="700" rx="60"/>
+
+  <!-- front caster wheel -->
+  <circle class="wheel" cx="450" cy="270" r="28"/>
+  <text x="450" y="320" class="label" text-anchor="middle">Caster wheel</text>
+  <text x="450" y="335" class="sub" text-anchor="middle">swivel, front-center</text>
+
+  <!-- ultrasonic sensor, front bumper -->
+  <rect class="part" x="410" y="210" width="80" height="34" rx="4"/>
+  <text x="450" y="232" class="label" text-anchor="middle" font-size="12">HC-SR04</text>
+
+  <!-- blade motor + cutting circle, center -->
+  <circle class="blade" cx="450" cy="500" r="140"/>
+  <rect class="part" x="405" y="465" width="90" height="70" rx="6"/>
+  <text x="450" y="495" class="label" text-anchor="middle">Blade</text>
+  <text x="450" y="510" class="label" text-anchor="middle">Motor</text>
+  <text x="450" y="660" class="sub" text-anchor="middle">dashed = cutting swath</text>
+
+  <!-- drive wheels, rear axle -->
+  <rect class="wheel" x="150" y="620" width="50" height="110" rx="8"/>
+  <text x="175" y="750" class="label" text-anchor="middle">Left</text>
+  <text x="175" y="765" class="label" text-anchor="middle">drive wheel</text>
+
+  <rect class="wheel" x="700" y="620" width="50" height="110" rx="8"/>
+  <text x="725" y="750" class="label" text-anchor="middle">Right</text>
+  <text x="725" y="765" class="label" text-anchor="middle">drive wheel</text>
+
+  <!-- gear motors driving the wheels -->
+  <rect class="part" x="205" y="655" width="70" height="40" rx="4"/>
+  <text x="240" y="679" class="label" text-anchor="middle" font-size="11">Motor L</text>
+  <rect class="part" x="625" y="655" width="70" height="40" rx="4"/>
+  <text x="660" y="679" class="label" text-anchor="middle" font-size="11">Motor R</text>
+
+  <!-- rear equipment bay: battery, ESP32, driver, relay -->
+  <rect class="part" x="270" y="790" width="140" height="70" rx="6"/>
+  <text x="340" y="818" class="label" text-anchor="middle">Battery</text>
+  <text x="340" y="834" class="sub" text-anchor="middle">12V 12Ah, low + rear</text>
+  <text x="340" y="848" class="sub" text-anchor="middle">for stability</text>
+
+  <rect class="part" x="490" y="790" width="140" height="70" rx="6"/>
+  <text x="560" y="815" class="label" text-anchor="middle">Electronics box</text>
+  <text x="560" y="831" class="sub" text-anchor="middle">ESP32, L298N,</text>
+  <text x="560" y="845" class="sub" text-anchor="middle">relay, buck conv.</text>
+
+  <!-- e-stop, top rear for reach -->
+  <circle class="part" cx="450" cy="860" r="26"/>
+  <text x="450" y="864" class="label" text-anchor="middle" font-size="11">E-STOP</text>
+  <text x="450" y="905" class="sub" text-anchor="middle">mounted on rear handle/mast,</text>
+  <text x="450" y="918" class="sub" text-anchor="middle">reachable without bending over blade</text>
+
+  <!-- main switch near battery -->
+  <rect class="part" x="270" y="880" width="70" height="30" rx="4"/>
+  <text x="305" y="900" class="label" text-anchor="middle" font-size="11">Switch</text>
+
+  <!-- notes -->
+  <g transform="translate(24,950)">
+    <text class="sub">Layout notes: battery kept low and toward the rear for center-of-gravity stability over the drive axle.</text>
+    <text y="16" class="sub">Blade motor is isolated from the electronics bay by the deck's center divider — route blade wiring along the chassis edge, not over it.</text>
+  </g>
+</svg>
