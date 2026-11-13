@@ -158,7 +158,7 @@ fn main() {
                     .build()
                     .unwrap();
                 if let Err(e) = rt.block_on(set_power(&client, id, new_state)) {
-                    log(&format!("[kiosk] set_power({id}, {new_state}) failed: {e}"));
+                    log(&format!("[kiosk] error: set_power({id}, {new_state}) failed: {e}"));
                 }
             });
         });
@@ -190,7 +190,7 @@ fn main() {
                         });
                     }
                     Err(e) => {
-                        log(&format!("[kiosk] fetch_devices failed: {e}"));
+                        log(&format!("[kiosk] error: fetch_devices failed: {e}"));
                         let window_weak = window_weak.clone();
                         let _ = slint::invoke_from_event_loop(move || {
                             if let Some(w) = window_weak.upgrade() {
@@ -207,6 +207,6 @@ fn main() {
     log("[kiosk] entering window.run()");
     match window.run() {
         Ok(()) => log("[kiosk] window.run() returned Ok"),
-        Err(e) => log(&format!("[kiosk] window.run() returned Err: {e}")),
+        Err(e) => log(&format!("[kiosk] error: window.run() returned Err: {e}")),
     }
 }
