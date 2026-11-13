@@ -200,7 +200,11 @@ func main() {
 	})
 	mux.Handle("/", http.FileServer(http.Dir("dist")))
 
-	log.Fatal(http.ListenAndServe(":80", logRequests(mux)))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Fatal(http.ListenAndServe(":"+port, logRequests(mux)))
 }
 
 type statusWriter struct {
