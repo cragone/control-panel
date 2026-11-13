@@ -11,6 +11,7 @@
 // to exactly one tile: vecna's first device's name if available, else a
 // generic fallback -- not hardcoded to "Desktop".
 
+use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use futures_util::{SinkExt, StreamExt};
@@ -18,6 +19,20 @@ use serde::{Deserialize, Serialize};
 use slint::{Model, ModelRc, SharedString, VecModel, Weak};
 
 slint::include_modules!();
+
+/// cage doesn't forward the child process's stdout/stderr into systemd's
+/// journal for this unit in any way that's been observable while debugging
+/// the kiosk startup, so diagnostics go straight to a file instead.
+fn log(msg: &str) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/kiosk.log")
+    {
+        let _ = writeln!(f, "{msg}");
+        let _ = f.flush();
+    }
+}
 
 const DEFAULT_ZONE_ID: &str = "desktop";
 const DEFAULT_ZONE_NAME: &str = "Light";
@@ -73,14 +88,16 @@ fn update_tile(window: &MainWindow, zone_id: &str, f: impl FnOnce(&mut ZoneTile)
 }
 
 fn main() {
-    eprintln!("[kiosk] starting, creating window");
+    std::panic::set_hook(Box::new(|info| log(&format!("[kiosk] PANIC: {info}"))));
+
+    log("[kiosk] starting, creating window");
     let window = match MainWindow::new() {
         Ok(w) => {
-            eprintln!("[kiosk] window created ok");
+            log("[kiosk] window created ok");
             w
         }
         Err(e) => {
-            eprintln!("[kiosk] FATAL: MainWindow::new() failed: {e}");
+            log(&format!("[kiosk] FATAL: MainWindow::new() failed: {e}"));
             std::process::exit(1);
         }
     };
@@ -92,7 +109,7 @@ fn main() {
             .unwrap();
         rt.block_on(fetch_zone_name())
     };
-    eprintln!("[kiosk] zone_name = {zone_name:?}");
+    log(&format!("[kiosk] zone_name = {zone_name:?}"));
 
     let tiles = VecModel::from(vec![ZoneTile {
         zone_id: SharedString::from(DEFAULT_ZONE_ID),
@@ -100,7 +117,7 @@ fn main() {
         on: false,
     }]);
     window.set_zones(ModelRc::new(tiles));
-    eprintln!("[kiosk] zones set, about to run()");
+    log("[kiosk] zones set, about to run()");
 
     let outgoing: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<LightMsg>>>> =
         Arc::new(Mutex::new(None));
@@ -141,7 +158,7 @@ fn main() {
         rt.block_on(async move {
             loop {
                 if let Err(e) = run_ws(window_weak.clone(), outgoing.clone()).await {
-                    eprintln!("ws error: {e}");
+                    log(&format!("[kiosk] ws error: {e}"));
                 }
                 let _ = slint::invoke_from_event_loop({
                     let window_weak = window_weak.clone();
@@ -160,12 +177,14 @@ fn main() {
     heartbeat.start(
         slint::TimerMode::Repeated,
         std::time::Duration::from_secs(2),
-        || eprintln!("[kiosk] event loop alive"),
+        || log("[kiosk] event loop alive"),
     );
 
-    eprintln!("[kiosk] entering window.run()");
-    window.run().unwrap();
-    eprintln!("[kiosk] window.run() returned");
+    log("[kiosk] entering window.run()");
+    match window.run() {
+        Ok(()) => log("[kiosk] window.run() returned Ok"),
+        Err(e) => log(&format!("[kiosk] window.run() returned Err: {e}")),
+    }
 }
 
 async fn run_ws(
