@@ -73,7 +73,17 @@ fn update_tile(window: &MainWindow, zone_id: &str, f: impl FnOnce(&mut ZoneTile)
 }
 
 fn main() {
-    let window = MainWindow::new().unwrap();
+    eprintln!("[kiosk] starting, creating window");
+    let window = match MainWindow::new() {
+        Ok(w) => {
+            eprintln!("[kiosk] window created ok");
+            w
+        }
+        Err(e) => {
+            eprintln!("[kiosk] FATAL: MainWindow::new() failed: {e}");
+            std::process::exit(1);
+        }
+    };
 
     let zone_name = {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -82,6 +92,7 @@ fn main() {
             .unwrap();
         rt.block_on(fetch_zone_name())
     };
+    eprintln!("[kiosk] zone_name = {zone_name:?}");
 
     let tiles = VecModel::from(vec![ZoneTile {
         zone_id: SharedString::from(DEFAULT_ZONE_ID),
@@ -89,6 +100,7 @@ fn main() {
         on: false,
     }]);
     window.set_zones(ModelRc::new(tiles));
+    eprintln!("[kiosk] zones set, about to run()");
 
     let outgoing: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<LightMsg>>>> =
         Arc::new(Mutex::new(None));
@@ -144,7 +156,16 @@ fn main() {
         });
     });
 
+    let heartbeat = slint::Timer::default();
+    heartbeat.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_secs(2),
+        || eprintln!("[kiosk] event loop alive"),
+    );
+
+    eprintln!("[kiosk] entering window.run()");
     window.run().unwrap();
+    eprintln!("[kiosk] window.run() returned");
 }
 
 async fn run_ws(
