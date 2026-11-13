@@ -195,6 +195,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", HandleConnections)
+	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		WriteJSONResponse(w, http.StatusOK, JSONMap{"ok": true})
+	})
 	mux.Handle("/", http.FileServer(http.Dir("dist")))
 
 	log.Fatal(http.ListenAndServe(":80", logRequests(mux)))
